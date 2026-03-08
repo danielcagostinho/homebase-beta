@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Star } from "lucide-react";
 import { Checkbox } from "@repo/ui/checkbox";
 import { Badge } from "@repo/ui/badge";
 import { cn } from "@/utils/cn";
@@ -10,6 +11,7 @@ import { DEFAULT_CATEGORIES } from "@/types/category";
 type TaskCardProps = {
   task: Task;
   onToggleComplete: (taskId: string, completed: boolean) => void;
+  onToggleStar?: (taskId: string, starred: boolean) => void;
 };
 
 const PRIORITY_VARIANTS = {
@@ -29,7 +31,7 @@ function isOverdue(dueDate: string | undefined): boolean {
   return new Date(dueDate) < new Date(new Date().toDateString());
 }
 
-export function TaskCard({ task, onToggleComplete }: TaskCardProps) {
+export function TaskCard({ task, onToggleComplete, onToggleStar }: TaskCardProps) {
   const categoryName =
     DEFAULT_CATEGORIES.find((c) => c.id === task.category)?.name ??
     task.category;
@@ -52,6 +54,18 @@ export function TaskCard({ task, onToggleComplete }: TaskCardProps) {
         }
         className="mt-0.5"
       />
+
+      {onToggleStar && (
+        <button
+          onClick={() => onToggleStar(task.id, !task.starred)}
+          className="mt-0.5 text-muted-foreground hover:text-primary transition-colors"
+          aria-label={task.starred ? "Unstar task" : "Star task"}
+        >
+          <Star
+            className={cn("h-4 w-4", task.starred && "fill-primary text-primary")}
+          />
+        </button>
+      )}
 
       <div className="flex flex-1 flex-col gap-1.5">
         <Link
@@ -82,12 +96,30 @@ export function TaskCard({ task, onToggleComplete }: TaskCardProps) {
               {new Date(task.dueDate).toLocaleDateString()}
             </span>
           )}
-          {task.subtasks.length > 0 && (
-            <span className="caption text-muted-foreground">
-              {task.subtasks.filter((s) => s.completed).length}/
-              {task.subtasks.length} subtasks
-            </span>
-          )}
+          {task.tags.length > 0 &&
+            task.tags.map((tag) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
+              </Badge>
+            ))}
+          {task.subtasks.length > 0 && (() => {
+            const completed = task.subtasks.filter((s) => s.completed).length;
+            const total = task.subtasks.length;
+            const pct = Math.round((completed / total) * 100);
+            return (
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="caption text-muted-foreground">
+                  {completed}/{total} subtasks
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

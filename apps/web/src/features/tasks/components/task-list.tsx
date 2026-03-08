@@ -10,11 +10,15 @@ import { useUpdateTask } from "../api/update-task";
 export function TaskList() {
   const { data: tasks, isLoading } = useTasks();
   const updateTask = useUpdateTask();
-  const { view, category, priority, setFilter, filterTasks } =
+  const { view, category, priority, sort, setFilter, filterTasks } =
     useTaskFilters();
 
   function handleToggleComplete(taskId: string, completed: boolean) {
     updateTask.mutate({ id: taskId, completed });
+  }
+
+  function handleToggleStar(taskId: string, starred: boolean) {
+    updateTask.mutate({ id: taskId, starred });
   }
 
   if (isLoading) {
@@ -33,6 +37,7 @@ export function TaskList() {
         view={view}
         category={category}
         priority={priority}
+        sort={sort}
         onFilterChange={setFilter}
       />
 
@@ -49,6 +54,7 @@ export function TaskList() {
               key={task.id}
               task={task}
               onToggleComplete={handleToggleComplete}
+              onToggleStar={handleToggleStar}
             />
           ))}
         </div>

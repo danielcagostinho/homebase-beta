@@ -10,17 +10,19 @@ import {
 } from "@repo/ui/select";
 import { DEFAULT_CATEGORIES } from "@/types/category";
 import { cn } from "@/utils/cn";
-import type { TaskView } from "../hooks/use-task-filters";
+import type { TaskView, TaskSort } from "../hooks/use-task-filters";
 
 type TaskFiltersProps = {
   view: TaskView;
   category: string;
   priority: string;
+  sort: TaskSort;
   onFilterChange: (key: string, value: string) => void;
 };
 
 const VIEWS: { value: TaskView; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "overdue", label: "Overdue" },
   { value: "today", label: "Today" },
   { value: "upcoming", label: "Upcoming" },
   { value: "completed", label: "Completed" },
@@ -30,10 +32,11 @@ export function TaskFilters({
   view,
   category,
   priority,
+  sort,
   onFilterChange,
 }: TaskFiltersProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
       <div className="flex gap-1">
         {VIEWS.map((v) => (
           <Button
@@ -80,6 +83,21 @@ export function TaskFilters({
             <SelectItem value="high">High</SelectItem>
             <SelectItem value="medium">Medium</SelectItem>
             <SelectItem value="low">Low</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={sort}
+          onValueChange={(val) => onFilterChange("sort", val === "due-date" ? "" : val)}
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Sort by" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="due-date">Due date</SelectItem>
+            <SelectItem value="priority">Priority</SelectItem>
+            <SelectItem value="created">Newest first</SelectItem>
+            <SelectItem value="alphabetical">A-Z</SelectItem>
           </SelectContent>
         </Select>
       </div>

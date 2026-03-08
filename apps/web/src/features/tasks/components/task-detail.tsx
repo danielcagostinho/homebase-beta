@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Textarea } from "@repo/ui/textarea";
@@ -26,9 +26,11 @@ import {
   DialogDescription,
 } from "@repo/ui/dialog";
 import { DEFAULT_CATEGORIES } from "@/types/category";
+import type { Subtask } from "@/types/task";
 import { useTask } from "../api/get-task";
 import { useUpdateTask } from "../api/update-task";
 import { useDeleteTask } from "../api/delete-task";
+import { TagPicker } from "./tag-picker";
 import { useState } from "react";
 
 const editFormSchema = z.object({
@@ -52,6 +54,8 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [tags, setTags] = useState<string[]>(task?.tags ?? []);
 
   const {
     register,
@@ -101,7 +105,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
   function onSubmit(data: EditFormValues) {
     updateTask.mutate(
-      { id: taskId, ...data },
+      { id: taskId, ...data, tags },
       { onSuccess: () => router.push("/tasks") },
     );
   }
@@ -114,6 +118,30 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
   function handleToggleComplete() {
     updateTask.mutate({ id: taskId, completed: !task!.completed });
+  }
+
+  function handleAddSubtask() {
+    const title = newSubtaskTitle.trim();
+    if (!title) return;
+    const subtask: Subtask = {
+      id: crypto.randomUUID(),
+      title,
+      completed: false,
+    };
+    updateTask.mutate({ id: taskId, subtasks: [...task!.subtasks, subtask] });
+    setNewSubtaskTitle("");
+  }
+
+  function handleToggleSubtask(subtaskId: string) {
+    const updated = task!.subtasks.map((s) =>
+      s.id === subtaskId ? { ...s, completed: !s.completed } : s,
+    );
+    updateTask.mutate({ id: taskId, subtasks: updated });
+  }
+
+  function handleDeleteSubtask(subtaskId: string) {
+    const updated = task!.subtasks.filter((s) => s.id !== subtaskId);
+    updateTask.mutate({ id: taskId, subtasks: updated });
   }
 
   const priorityVariant = { high: "high", medium: "medium", low: "low" } as const;
@@ -238,6 +266,79 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
         </div>
 
         <Textarea id="notes" label="Notes" {...register("notes")} />
+
+        <TagPicker value={tags} onChange={setTags} />
+
+        {/* Subtasks */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <label className="label text-foreground">Subtasks</label>
+            {task.subtasks.length > 0 && (
+              <span className="caption text-muted-foreground">
+                {task.subtasks.filter((s) => s.completed).length}/
+                {task.subtasks.length} subtasks completed
+              </span>
+            )}
+          </div>
+
+          {task.subtasks.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {task.subtasks.map((subtask) => (
+                <div
+                  key={subtask.id}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                >
+                  <Checkbox
+                    checked={subtask.completed}
+                    onCheckedChange={() => handleToggleSubtask(subtask.id)}
+                  />
+                  <span
+                    className={
+                      subtask.completed
+                        ? "body flex-1 text-muted-foreground line-through"
+                        : "body flex-1 text-foreground"
+                    }
+                  >
+                    {subtask.title}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleDeleteSubtask(subtask.id)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Input
+              id="new-subtask"
+              placeholder="Add a subtask..."
+              value={newSubtaskTitle}
+              onChange={(e) => setNewSubtaskTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddSubtask();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleAddSubtask}
+              disabled={!newSubtaskTitle.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
         {updateTask.error && (
           <p className="body text-destructive">

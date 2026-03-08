@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
@@ -23,6 +24,7 @@ import {
 import { DEFAULT_CATEGORIES } from "@/types/category";
 import type { CreateTaskInput } from "@/types/task";
 import { useCreateTask } from "../api/create-task";
+import { TagPicker } from "./tag-picker";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -42,6 +44,7 @@ type CreateTaskDialogProps = {
 
 export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) {
   const createTask = useCreateTask();
+  const [tags, setTags] = useState<string[]>([]);
 
   const {
     register,
@@ -67,12 +70,13 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
     const input: CreateTaskInput = {
       ...data,
       subtasks: [],
-      tags: [],
+      tags,
       links: [],
     };
     createTask.mutate(input, {
       onSuccess: () => {
         reset();
+        setTags([]);
         onOpenChange(false);
       },
     });
@@ -185,6 +189,8 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
             placeholder="Any additional details..."
             {...register("notes")}
           />
+
+          <TagPicker value={tags} onChange={setTags} />
 
           {createTask.error && (
             <p className="body text-destructive">
