@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RegisterForm } from "@/features/auth/components/register-form";
 
 export default function RegisterPage() {
   return (
@@ -10,9 +11,7 @@ export default function RegisterPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/50 p-8 text-center body text-muted-foreground">
-        Registration form coming soon
-      </div>
+      <RegisterForm />
 
       <p className="body text-center text-muted-foreground">
         Already have an account?{" "}

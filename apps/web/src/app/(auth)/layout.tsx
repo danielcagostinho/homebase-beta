@@ -1,4 +1,7 @@
+import { GuestGuard } from "@/features/auth/components/guest-guard";
 import type { ReactNode } from "react";
+
+export const dynamic = "force-dynamic";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -7,7 +10,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <div className="mb-8 text-center">
           <h1 className="heading-lg text-foreground">HomeBase</h1>
         </div>
-        {children}
+        <GuestGuard>{children}</GuestGuard>
       </div>
     </div>
   );

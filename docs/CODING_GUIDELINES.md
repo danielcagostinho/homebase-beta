@@ -255,17 +255,17 @@ Custom utility classes are defined in `globals.css`. They set font family, size,
 
 ### Where Code Runs
 
-Not everything goes through API routes. The rule is simple:
+All data access goes through Next.js API routes because the database (Neon Postgres) requires server-side credentials.
 
-| Data Operation         | Where it Runs                  | Why                                              |
-| ---------------------- | ------------------------------ | ------------------------------------------------ |
-| Firestore reads/writes | **Client-side** (Firebase SDK) | Security rules enforce access; no backend needed |
-| Anthropic AI calls     | **Server-side** (API route)    | API key must stay server-side                    |
-| Auth session cookie    | **Server-side** (API route)    | httpOnly cookies require server                  |
-| Email sending          | **Server-side** (API route)    | Email provider key must stay server-side         |
-| Scheduled jobs         | **Server-side** (Vercel Cron)  | Needs reliable scheduling                        |
+| Data Operation     | Where it Runs                 | Why                                      |
+| ------------------ | ----------------------------- | ---------------------------------------- |
+| Database CRUD      | **Server-side** (API route)   | DATABASE_URL must stay server-side       |
+| Authentication     | **Server-side** (Auth.js)     | Session + credentials handled by Auth.js |
+| Anthropic AI calls | **Server-side** (API route)   | API key must stay server-side            |
+| Email sending      | **Server-side** (API route)   | Email provider key must stay server-side |
+| Scheduled jobs     | **Server-side** (Vercel Cron) | Needs reliable scheduling                |
 
-**Rule of thumb:** If it needs a secret or server authority, use an API route. If it's just CRUD against Firestore, use the client SDK directly.
+**Rule of thumb:** All mutations and data fetching go through API routes. React Query hooks on the client call these endpoints with `useQuery` and `useMutation`.
 
 ### API Request Pattern (3-Part)
 
@@ -402,9 +402,10 @@ app/
 
 ### Authentication
 
-- Firebase Auth for identity (email/password, Google sign-in).
-- Session managed via **httpOnly cookies** — never localStorage for tokens.
-- Auth state provided via React Query (`useUser` hook pattern from `react-query-auth`).
+- **Auth.js (NextAuth v5)** for identity (email/password credentials, Google OAuth).
+- **Neon Postgres** stores users, sessions, and accounts via Drizzle adapter.
+- Session strategy: **JWT** — no server-side session lookups needed.
+- Auth state provided via `useSession()` from `next-auth/react`, wrapped in a `useUser()` hook.
 
 ### Authorization
 
@@ -512,7 +513,7 @@ onMouseEnter={() => queryClient.prefetchQuery(getTaskQueryOptions(id))}
 3. **No inline event handlers.** Use React's event system.
 4. **httpOnly cookies** for auth tokens. Never localStorage.
 5. **Validate all inputs** at system boundaries with Zod — client and server.
-6. **Firestore rules** must enforce row-level security. Users access only their own data.
+6. **API routes** must enforce row-level security. Users access only their own data (filter by `session.user.id`).
 7. **CSP headers** configured in `next.config.js` or middleware.
 
 ### Content Security Policy
@@ -537,7 +538,7 @@ These are non-negotiable rules for migrating the legacy HomeBase app:
 1. **Do NOT copy-paste legacy code.** Rewrite everything using the patterns in this document.
 2. **Define typed domain models first** before building UI:
    - `Task`, `Subtask`, `Tag`, `Category`, `User`, `Household`, `Settings`
-3. **Local-first data with explicit sync.** Use React Query for cache, Firestore for persistence.
+3. **Server-side data.** All CRUD goes through API routes. React Query caches on the client, Neon Postgres persists.
 4. **Eliminate the monolith.** The legacy app is ~7,000 lines in one HTML file. Every feature gets its own module.
 5. **Add tests early.** Don't wait until the end. Write integration tests alongside feature code.
 6. **Server-side AI.** The Anthropic API proxy must be a Next.js API route with server-side key management.
@@ -545,7 +546,7 @@ These are non-negotiable rules for migrating the legacy HomeBase app:
 ### Migration Order
 
 1. Domain models + types + Zod schemas
-2. Auth flow (Firebase Auth + server session)
+2. Auth flow (Auth.js + JWT session)
 3. Task CRUD (core feature)
 4. Tags, categories, assignees
 5. Calendar views
@@ -571,8 +572,8 @@ These are non-negotiable rules for migrating the legacy HomeBase app:
 | Global state | Zustand                                     |
 | Forms        | React Hook Form                             |
 | Validation   | Zod                                         |
-| HTTP client  | Axios (or fetch wrapper)                    |
-| Auth         | Firebase Auth + react-query-auth            |
+| Database     | Neon Postgres + Drizzle ORM                 |
+| Auth         | Auth.js (NextAuth v5) + Drizzle adapter      |
 | Testing      | Vitest + Testing Library + Playwright + MSW |
 | Linting      | ESLint 9 + Prettier                         |
 | Monorepo     | Turborepo + pnpm                            |

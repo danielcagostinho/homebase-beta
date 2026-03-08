@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LoginForm } from "@/features/auth/components/login-form";
 
 export default function LoginPage() {
   return (
@@ -10,9 +11,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/50 p-8 text-center body text-muted-foreground">
-        Login form coming soon
-      </div>
+      <LoginForm />
 
       <p className="body text-center text-muted-foreground">
         Don&apos;t have an account?{" "}
