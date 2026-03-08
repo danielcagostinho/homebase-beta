@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-primary: #b08068;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f0e6de;
+  --color-secondary-foreground: #4a3f3a;
+  --color-background: #faf7f4;
+  --color-foreground: #4a3f3a;
+  --color-muted: #f0ebe6;
+  --color-muted-foreground: #8a7f78;
+  --color-destructive: #dc3545;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2d9d0;
+  --color-ring: #b08068;
+
+  /* Category colors */
+  --color-category-home: #b08068;
+  --color-category-personal: #7c9a8e;
+  --color-category-work: #8b7bb4;
+
+  /* Priority colors */
+  --color-priority-high: #dc3545;
+  --color-priority-medium: #e8a838;
+  --color-priority-low: #7c9a8e;
+
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "DM Serif Display", ui-serif, Georgia, serif;
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
