@@ -1,4 +1,4 @@
-import type { HttpHandler } from "msw";
+import { taskHandlers } from "./tasks";
+import { authHandlers } from "./auth";
 
-// Handlers will be added per-feature as we build them
-export const handlers: HttpHandler[] = [];
+export const handlers = [...taskHandlers, ...authHandlers];

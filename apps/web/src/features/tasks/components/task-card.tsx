@@ -38,6 +38,8 @@ export function TaskCard({ task, onToggleComplete }: TaskCardProps) {
 
   return (
     <div
+      data-testid="task-card"
+      data-task-title={task.title}
       className={cn(
         "flex items-start gap-3 rounded-lg border border-border p-4 transition-colors hover:bg-muted/50",
         task.completed && "opacity-60",
