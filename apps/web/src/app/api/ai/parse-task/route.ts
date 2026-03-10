@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { DEFAULT_CATEGORIES } from "@/types/category";
 
@@ -35,12 +35,12 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser(request);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { allowed, retryAfterMs } = checkRateLimit(session.user.id);
+  const { allowed, retryAfterMs } = checkRateLimit(user.id);
   if (!allowed) {
     return NextResponse.json(
       { error: "Rate limit exceeded", retryAfterMs },

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -11,8 +11,8 @@ import { validateOrigin } from "@/lib/api-utils";
 type Params = { params: Promise<{ taskId: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser(_request);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: Params) {
   const [task] = await db
     .select()
     .from(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, session.user.id)))
+    .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
     .limit(1);
 
   if (!task) {
@@ -50,8 +50,8 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthUser(request);
+    if (!user) {
       throw new ApiError(401, "Unauthorized");
     }
 
@@ -94,7 +94,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const [task] = await db
       .update(tasks)
       .set(updates)
-      .where(and(eq(tasks.id, taskId), eq(tasks.userId, session.user.id)))
+      .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
       .returning();
 
     if (!task) {
@@ -115,7 +115,7 @@ export async function PATCH(request: Request, { params }: Params) {
       const [nextTask] = await db
         .insert(tasks)
         .values({
-          userId: session.user.id,
+          userId: user.id,
           title: task.title,
           category: task.category,
           subcategory: task.subcategory,
@@ -161,8 +161,8 @@ export async function DELETE(request: Request, { params }: Params) {
       );
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthUser(request);
+    if (!user) {
       throw new ApiError(401, "Unauthorized");
     }
 
@@ -170,7 +170,7 @@ export async function DELETE(request: Request, { params }: Params) {
 
     const [task] = await db
       .delete(tasks)
-      .where(and(eq(tasks.id, taskId), eq(tasks.userId, session.user.id)))
+      .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
       .returning({ id: tasks.id });
 
     if (!task) {

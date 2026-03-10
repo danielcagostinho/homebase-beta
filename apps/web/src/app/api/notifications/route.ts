@@ -1,21 +1,21 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const result = await db
     .select()
     .from(notifications)
-    .where(eq(notifications.userId, session.user.id))
+    .where(eq(notifications.userId, user.id))
     .orderBy(desc(notifications.createdAt))
     .limit(50);
 
@@ -23,8 +23,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser(request);
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const [notification] = await db
       .insert(notifications)
       .values({
-        userId: body.userId ?? session.user.id,
+        userId: body.userId ?? user.id,
         type: body.type,
         title: body.title,
         message: body.message,

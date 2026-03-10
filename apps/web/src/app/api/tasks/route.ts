@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { db } from "@/db";
 import { tasks } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -11,15 +11,15 @@ import { handleApiError, ApiError } from "@/lib/api-error";
 import { validateOrigin } from "@/lib/api-utils";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const result = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.userId, session.user.id))
+    .where(eq(tasks.userId, user.id))
     .orderBy(desc(tasks.createdAt));
 
   return NextResponse.json(result);
@@ -44,8 +44,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthUser(request);
+    if (!user) {
       throw new ApiError(401, "Unauthorized");
     }
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const [task] = await db
       .insert(tasks)
       .values({
-        userId: session.user.id,
+        userId: user.id,
         title: validated.title,
         category: validated.category,
         subcategory: validated.subcategory,

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { db } from "@/db";
 import { households, householdMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -14,8 +14,8 @@ const createHouseholdSchema = z.object({
 });
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,7 +30,7 @@ export async function GET() {
     })
     .from(householdMembers)
     .innerJoin(households, eq(householdMembers.householdId, households.id))
-    .where(eq(householdMembers.userId, session.user.id))
+    .where(eq(householdMembers.userId, user.id))
     .limit(1);
 
   if (membership.length === 0) {
@@ -46,8 +46,8 @@ export async function POST(request: Request) {
       throw new ApiError(403, "Forbidden");
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
+    const user = await getAuthUser(request);
+    if (!user) {
       throw new ApiError(401, "Unauthorized");
     }
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const existing = await db
       .select()
       .from(householdMembers)
-      .where(eq(householdMembers.userId, session.user.id))
+      .where(eq(householdMembers.userId, user.id))
       .limit(1);
 
     if (existing.length > 0) {
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       .values({
         name,
         code,
-        createdBy: session.user.id,
+        createdBy: user.id,
       })
       .returning();
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
     await db.insert(householdMembers).values({
       householdId: household.id,
-      userId: session.user.id,
+      userId: user.id,
       role: "owner",
     });
 

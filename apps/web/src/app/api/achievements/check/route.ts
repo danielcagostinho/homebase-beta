@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getAuthUser } from "@/lib/get-auth-user";
 import { db } from "@/db";
 import { achievements, tasks } from "@/db/schema";
 import { eq, and, count, sql } from "drizzle-orm";
 import { ACHIEVEMENTS } from "@/features/gamification/achievements";
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const user = await getAuthUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
   // Get existing achievements
   const existing = await db
