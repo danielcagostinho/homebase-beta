@@ -112,6 +112,8 @@ export default function NotificationsScreen() {
           <NotificationItem item={item} onPress={handlePress} />
         )}
         contentContainerStyle={styles.listContent}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

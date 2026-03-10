@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useTasks, useUpdateTask, useDeleteTask } from "../../hooks/use-tasks";
 import type { Task } from "@repo/shared/types/task";
 
@@ -38,7 +39,9 @@ export default function TaskDetailScreen() {
 
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [showNotesInput, setShowNotesInput] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newTag, setNewTag] = useState("");
 
   useEffect(() => {
     if (task) {
@@ -50,6 +53,11 @@ export default function TaskDetailScreen() {
   const handleToggleCompleted = () => {
     if (!task) return;
     const newCompleted = !task.completed;
+    if (newCompleted) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     updateTask.mutate({
       id: task.id,
       completed: newCompleted,
@@ -94,6 +102,27 @@ export default function TaskDetailScreen() {
     updateTask.mutate({ id: task.id, subtasks: updatedSubtasks });
     setNewSubtaskTitle("");
   }, [task, newSubtaskTitle, updateTask]);
+
+  const handleRemoveTag = useCallback(
+    (tagToRemove: string) => {
+      if (!task) return;
+      const updatedTags = (task.tags ?? []).filter((t) => t !== tagToRemove);
+      updateTask.mutate({ id: task.id, tags: updatedTags });
+    },
+    [task, updateTask]
+  );
+
+  const handleAddTag = useCallback(() => {
+    if (!task || newTag.trim() === "") return;
+    const trimmed = newTag.trim();
+    if ((task.tags ?? []).includes(trimmed)) {
+      setNewTag("");
+      return;
+    }
+    const updatedTags = [...(task.tags ?? []), trimmed];
+    updateTask.mutate({ id: task.id, tags: updatedTags });
+    setNewTag("");
+  }, [task, newTag, updateTask]);
 
   const handleDelete = () => {
     if (!task) return;
@@ -177,6 +206,8 @@ export default function TaskDetailScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
         {/* Status Section */}
         <TouchableOpacity
@@ -245,7 +276,7 @@ export default function TaskDetailScreen() {
 
         {/* Notes Section */}
         <Text style={styles.sectionTitle}>Notes</Text>
-        {task.notes || notes ? (
+        {task.notes || notes || showNotesInput ? (
           <TextInput
             style={styles.notesInput}
             value={notes}
@@ -255,9 +286,12 @@ export default function TaskDetailScreen() {
             placeholderTextColor="#8a7f78"
             multiline
             textAlignVertical="top"
+            autoFocus={showNotesInput && !task.notes && !notes}
           />
         ) : (
-          <Text style={styles.emptyText}>No notes</Text>
+          <TouchableOpacity onPress={() => setShowNotesInput(true)}>
+            <Text style={styles.addNotesText}>Add notes...</Text>
+          </TouchableOpacity>
         )}
 
         {/* Subtasks Section */}
@@ -303,17 +337,33 @@ export default function TaskDetailScreen() {
 
         {/* Tags Section */}
         <Text style={styles.sectionTitle}>Tags</Text>
-        {task.tags && task.tags.length > 0 ? (
-          <View style={styles.tagsRow}>
-            {task.tags.map((tag) => (
-              <View key={tag} style={styles.tagBadge}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.emptyText}>No tags</Text>
-        )}
+        <View style={styles.tagsRow}>
+          {(task.tags ?? []).map((tag) => (
+            <View key={tag} style={styles.tagBadge}>
+              <Text style={styles.tagText}>{tag}</Text>
+              <TouchableOpacity
+                onPress={() => handleRemoveTag(tag)}
+                hitSlop={4}
+              >
+                <Ionicons name="close-circle" size={14} color="#b08068" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+        <View style={styles.addTagRow}>
+          <TextInput
+            style={styles.addTagInput}
+            value={newTag}
+            onChangeText={setNewTag}
+            placeholder="Add tag..."
+            placeholderTextColor="#8a7f78"
+            onSubmitEditing={handleAddTag}
+            returnKeyType="done"
+          />
+          <TouchableOpacity onPress={handleAddTag} hitSlop={8}>
+            <Ionicons name="add-circle-outline" size={24} color="#b08068" />
+          </TouchableOpacity>
+        </View>
 
         {/* Delete Button */}
         <TouchableOpacity
@@ -450,15 +500,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   notesInput: {
-    fontFamily: serifFont,
     fontSize: 14,
     color: "#4a3f3a",
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e2d9d0",
-    padding: 14,
+    padding: 12,
     minHeight: 80,
+    marginBottom: 24,
+    textAlignVertical: "top",
+  },
+  addNotesText: {
+    fontSize: 14,
+    color: "#8a7f78",
     marginBottom: 24,
   },
   emptyText: {
@@ -512,19 +567,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 32,
   },
   tagBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#f0e8e2",
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4,
     borderRadius: 16,
+    gap: 6,
   },
   tagText: {
     fontFamily: serifFont,
     fontSize: 13,
     color: "#b08068",
     fontWeight: "500",
+  },
+  addTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 32,
+    marginTop: 8,
+  },
+  addTagInput: {
+    flex: 1,
+    fontFamily: serifFont,
+    fontSize: 14,
+    color: "#4a3f3a",
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2d9d0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   deleteButton: {
     flexDirection: "row",

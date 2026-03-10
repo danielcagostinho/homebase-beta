@@ -173,7 +173,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 ];
 
 export default function TasksScreen() {
-  const { data: tasks, isLoading, refetch } = useTasks();
+  const { data: tasks, isLoading, isError, refetch } = useTasks();
   const { data: notifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
@@ -248,12 +248,26 @@ export default function TasksScreen() {
             <TaskSkeleton key={i} />
           ))}
         </View>
+      ) : isError ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#dc3545" />
+          <Text style={styles.errorText}>Failed to load tasks</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => refetch()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={filteredTasks}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <TaskItem task={item} />}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 20 }}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -263,8 +277,9 @@ export default function TasksScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="checkmark-done" size={48} color="#e2d9d0" />
-              <Text style={styles.emptyText}>No tasks yet</Text>
+              <Ionicons name="checkbox-outline" size={64} color="#e2d9d0" />
+              <Text style={styles.emptyTitle}>No tasks yet</Text>
+              <Text style={styles.emptySubtitle}>Tap + to create your first task</Text>
             </View>
           }
         />
@@ -356,15 +371,45 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#8a7f78",
   },
+  errorContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+  },
+  errorText: {
+    color: "#dc3545",
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: "#b08068",
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 80,
   },
-  emptyText: {
-    color: "#8a7f78",
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#4a3f3a",
     marginTop: 16,
-    fontSize: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#8a7f78",
+    marginTop: 4,
   },
   taskItem: {
     flexDirection: "row",

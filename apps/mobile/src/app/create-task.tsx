@@ -89,6 +89,7 @@ export default function CreateTaskScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
       >
         {/* Title */}
@@ -100,7 +101,7 @@ export default function CreateTaskScreen() {
             placeholderTextColor="#8a7f78"
             value={title}
             onChangeText={setTitle}
-            autoFocus
+            autoFocus={true}
           />
         </View>
 
