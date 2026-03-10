@@ -1,9 +1,12 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { OfflineBanner } from "../../components/offline-banner";
 
 export default function TabLayout() {
   return (
-    <Tabs
+    <>
+      <OfflineBanner />
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#b08068",
         tabBarInactiveTintColor: "#8a7f78",
@@ -52,5 +55,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </>
   );
 }

@@ -1,22 +1,25 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
+  TextInput,
   StyleSheet,
   Platform,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useTasks, useUpdateTask, useDeleteTask } from "../../hooks/use-tasks";
+import { useTasks, useUpdateTask, useDeleteTask, useCreateTask } from "../../hooks/use-tasks";
 import { useNotifications } from "../../hooks/use-notifications";
 import { TaskSkeleton } from "../../components/task-skeleton";
-import type { Task } from "@repo/shared/types/task";
+import { api } from "../../lib/api";
+import type { Task, CreateTaskInput } from "@repo/shared/types/task";
 
 const serifFont = Platform.select({
   ios: "Georgia",
@@ -25,6 +28,22 @@ const serifFont = Platform.select({
 });
 
 type FilterTab = "all" | "active" | "completed";
+type SortMode = "newest" | "priority" | "dueDate";
+
+const SORT_LABELS: Record<SortMode, string> = {
+  newest: "Sort: Newest",
+  priority: "Sort: Priority",
+  dueDate: "Sort: Due Date",
+};
+
+const SORT_ORDER: SortMode[] = ["newest", "priority", "dueDate"];
+
+const PRIORITY_RANK: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 
 const priorityStyles: Record<
   string,
@@ -148,21 +167,43 @@ function TaskItem({ task }: { task: Task }) {
   );
 }
 
-function sortTasks(tasks: Task[]): Task[] {
+function compareTasks(a: Task, b: Task, mode: SortMode): number {
+  switch (mode) {
+    case "priority": {
+      const rankA = PRIORITY_RANK[a.priority] ?? 3;
+      const rankB = PRIORITY_RANK[b.priority] ?? 3;
+      if (rankA !== rankB) return rankA - rankB;
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    }
+    case "dueDate": {
+      const hasDueA = a.dueDate ? 0 : 1;
+      const hasDueB = b.dueDate ? 0 : 1;
+      if (hasDueA !== hasDueB) return hasDueA - hasDueB;
+      if (a.dueDate && b.dueDate) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    }
+    case "newest":
+    default: {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    }
+  }
+}
+
+function sortTasks(tasks: Task[], mode: SortMode): Task[] {
   const active = tasks
     .filter((t) => t.status !== "completed")
-    .sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    .sort((a, b) => compareTasks(a, b, mode));
   const completed = tasks
     .filter((t) => t.status === "completed")
-    .sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateB - dateA;
-    });
+    .sort((a, b) => compareTasks(a, b, mode));
   return [...active, ...completed];
 }
 
@@ -172,11 +213,80 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "completed", label: "Completed" },
 ];
 
+interface ParsedTaskResponse {
+  parsed: {
+    title: string;
+    category?: string;
+    subcategory?: string;
+    priority?: "high" | "medium" | "low";
+    dueDate?: string;
+    tags?: string[];
+    notes?: string;
+  };
+}
+
 export default function TasksScreen() {
   const { data: tasks, isLoading, isError, refetch } = useTasks();
   const { data: notifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [smartInput, setSmartInput] = useState("");
+  const [smartInputLoading, setSmartInputLoading] = useState(false);
+  const [smartInputError, setSmartInputError] = useState<string | null>(null);
+  const smartInputRef = useRef<TextInput>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const createTask = useCreateTask();
+
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
+  const handleSmartSubmit = useCallback(async () => {
+    const text = smartInput.trim();
+    if (!text || smartInputLoading) return;
+
+    setSmartInputLoading(true);
+    setSmartInputError(null);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+
+    try {
+      const { parsed } = await api<ParsedTaskResponse>("/api/ai/parse-task", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+
+      const taskData: CreateTaskInput = {
+        title: parsed.title,
+        category: parsed.category ?? "personal",
+        priority: parsed.priority ?? "medium",
+        ...(parsed.dueDate ? { dueDate: parsed.dueDate } : {}),
+        ...(parsed.subcategory ? { subcategory: parsed.subcategory } : {}),
+        ...(parsed.tags?.length ? { tags: parsed.tags } : {}),
+        ...(parsed.notes ? { notes: parsed.notes } : {}),
+      };
+
+      createTask.mutate(taskData);
+      setSmartInput("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to parse task";
+      setSmartInputError(message);
+      errorTimerRef.current = setTimeout(() => setSmartInputError(null), 3000);
+    } finally {
+      setSmartInputLoading(false);
+    }
+  }, [smartInput, smartInputLoading, createTask]);
+
+  const handleCycleSortMode = useCallback(() => {
+    setSortMode((current) => {
+      const idx = SORT_ORDER.indexOf(current);
+      return SORT_ORDER[(idx + 1) % SORT_ORDER.length];
+    });
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -184,13 +294,25 @@ export default function TasksScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const filteredTasks = sortTasks(
-    (tasks ?? []).filter((task) => {
+  const filteredTasks = useMemo(() => {
+    let result = (tasks ?? []).filter((task) => {
       if (activeFilter === "active") return task.status !== "completed";
       if (activeFilter === "completed") return task.status === "completed";
       return true;
-    })
-  );
+    });
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      result = result.filter((task) =>
+        task.title.toLowerCase().includes(query)
+      );
+    }
+
+    return sortTasks(result, sortMode);
+  }, [tasks, activeFilter, searchQuery, sortMode]);
+
+  const filterLabel = activeFilter === "all" ? "" : `${activeFilter} `;
+  const taskCountText = `${filteredTasks.length} ${filterLabel}task${filteredTasks.length !== 1 ? "s" : ""}`;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -214,6 +336,24 @@ export default function TasksScreen() {
             <Ionicons name="add" size={24} color="#ffffff" />
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Search bar */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search-outline" size={18} color="#8a7f78" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search tasks..."
+          placeholderTextColor="#8a7f78"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color="#8a7f78" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.filterRow}>
@@ -240,6 +380,38 @@ export default function TasksScreen() {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      {/* Sort toggle and task count */}
+      <View style={styles.sortCountRow}>
+        <Text style={styles.taskCount}>{taskCountText}</Text>
+        <TouchableOpacity onPress={handleCycleSortMode} hitSlop={8}>
+          <Text style={styles.sortButton}>{SORT_LABELS[sortMode]}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.smartInputContainer}>
+        <View style={styles.smartInputBar}>
+          {smartInputLoading ? (
+            <ActivityIndicator size="small" color="#b08068" style={styles.smartInputIcon} />
+          ) : (
+            <Ionicons name="sparkles" size={18} color="#b08068" style={styles.smartInputIcon} />
+          )}
+          <TextInput
+            ref={smartInputRef}
+            style={styles.smartInputText}
+            placeholder="Add a task naturally... e.g. 'Buy groceries tomorrow'"
+            placeholderTextColor="#b0a89f"
+            value={smartInput}
+            onChangeText={setSmartInput}
+            returnKeyType="send"
+            onSubmitEditing={handleSmartSubmit}
+            editable={!smartInputLoading}
+          />
+        </View>
+        {smartInputError ? (
+          <Text style={styles.smartInputErrorText}>{smartInputError}</Text>
+        ) : null}
       </View>
 
       {isLoading ? (
@@ -332,11 +504,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  searchBar: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2d9d0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 20,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4a3f3a",
+    padding: 0,
+  },
   filterRow: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   filterTab: {
     paddingHorizontal: 16,
@@ -358,6 +551,50 @@ const styles = StyleSheet.create({
   },
   filterTabTextInactive: {
     color: "#4a3f3a",
+  },
+  sortCountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  taskCount: {
+    fontSize: 12,
+    color: "#8a7f78",
+  },
+  sortButton: {
+    fontSize: 12,
+    color: "#8a7f78",
+  },
+  smartInputContainer: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  smartInputBar: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2d9d0",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  smartInputIcon: {
+    marginRight: 10,
+  },
+  smartInputText: {
+    flex: 1,
+    fontSize: 14,
+    color: "#4a3f3a",
+    padding: 0,
+  },
+  smartInputErrorText: {
+    fontSize: 12,
+    color: "#dc3545",
+    marginTop: 6,
+    marginLeft: 4,
   },
   skeletonContainer: {
     paddingHorizontal: 20,
