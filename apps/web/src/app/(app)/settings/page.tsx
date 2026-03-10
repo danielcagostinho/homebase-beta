@@ -6,6 +6,8 @@ import { Button } from "@repo/ui/button";
 import { Spinner } from "@repo/ui/spinner";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@repo/ui/card";
 import { useRouter } from "next/navigation";
+import { HouseholdSettings } from "@/features/household/components/household-settings";
+import { NotificationSettings } from "@/features/notifications/components/notification-settings";
 
 export default function SettingsPage() {
   const { data: user, isLoading } = useUser();
@@ -59,6 +61,12 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Household */}
+        <HouseholdSettings />
+
+        {/* Notifications */}
+        <NotificationSettings />
 
         {/* Appearance */}
         <Card>

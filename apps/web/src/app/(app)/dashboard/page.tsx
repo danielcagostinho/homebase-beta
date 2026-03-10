@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTasks } from "@/features/tasks/api/get-tasks";
-import { useCreateTask } from "@/features/tasks/api/create-task";
 import { useUpdateTask } from "@/features/tasks/api/update-task";
 import { Spinner } from "@repo/ui/spinner";
-import { Input } from "@repo/ui/input";
-import { Button } from "@repo/ui/button";
 import { TaskCard } from "@/features/tasks/components/task-card";
+import { SmartTaskInput } from "@/features/ai/components/smart-task-input";
+import { CreateTaskDialog } from "@/features/tasks/components/create-task-dialog";
 import type { Task } from "@/types/task";
+import type { ParsedTask } from "@/features/ai/api/parse-task";
 
 function getDateString(date: string | Date | null | undefined): string {
   if (!date) return "";
@@ -19,8 +19,8 @@ function getDateString(date: string | Date | null | undefined): string {
 export default function DashboardPage() {
   const { data: tasks, isLoading } = useTasks();
   const updateTask = useUpdateTask();
-  const createTask = useCreateTask();
-  const [quickTitle, setQuickTitle] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogPrefill, setDialogPrefill] = useState<ParsedTask | undefined>();
 
   const allTasks = (tasks ?? []) as Task[];
   const today = getDateString(new Date());
@@ -41,20 +41,9 @@ export default function DashboardPage() {
     updateTask.mutate({ id: taskId, completed });
   }
 
-  function handleQuickAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!quickTitle.trim()) return;
-    createTask.mutate(
-      {
-        title: quickTitle.trim(),
-        category: "personal",
-        priority: "medium",
-        subtasks: [],
-        tags: [],
-        links: [],
-      },
-      { onSuccess: () => setQuickTitle("") },
-    );
+  function handleOpenCreateDialog(prefill: ParsedTask) {
+    setDialogPrefill(prefill);
+    setDialogOpen(true);
   }
 
   return (
@@ -66,18 +55,17 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Quick add */}
-      <form onSubmit={handleQuickAdd} className="flex gap-2">
-        <Input
-          placeholder="Quick add a task..."
-          value={quickTitle}
-          onChange={(e) => setQuickTitle(e.target.value)}
-          className="flex-1"
-        />
-        <Button type="submit" disabled={createTask.isPending || !quickTitle.trim()}>
-          {createTask.isPending ? "Adding..." : "Add"}
-        </Button>
-      </form>
+      {/* Smart quick add */}
+      <SmartTaskInput onOpenCreateDialog={handleOpenCreateDialog} />
+
+      <CreateTaskDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setDialogPrefill(undefined);
+        }}
+        prefill={dialogPrefill}
+      />
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

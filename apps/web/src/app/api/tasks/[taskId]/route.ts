@@ -74,6 +74,41 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Auto-generate next occurrence for recurring tasks
+  if (body.completed === true && task.recurring) {
+    const recurring = task.recurring as {
+      frequency: string;
+      interval?: number;
+      daysOfWeek?: number[];
+    };
+
+    const baseDate = task.dueDate ? new Date(task.dueDate) : new Date();
+    const nextDueDate = calculateNextDueDate(baseDate, recurring);
+
+    const [nextTask] = await db
+      .insert(tasks)
+      .values({
+        userId: session.user.id,
+        title: task.title,
+        category: task.category,
+        subcategory: task.subcategory,
+        priority: task.priority,
+        dueDate: nextDueDate,
+        subtasks: (task.subtasks as { id: string; title: string; completed: boolean }[]).map(
+          (s) => ({ ...s, completed: false }),
+        ),
+        tags: task.tags as string[],
+        assignee: task.assignee,
+        recurring: task.recurring,
+        notes: task.notes,
+        links: task.links as string[],
+        starred: task.starred,
+      })
+      .returning();
+
+    return NextResponse.json({ ...task, nextTask });
+  }
+
   return NextResponse.json(task);
 }
 
@@ -95,4 +130,47 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+function calculateNextDueDate(
+  baseDate: Date,
+  recurring: { frequency: string; interval?: number; daysOfWeek?: number[] },
+): Date {
+  const next = new Date(baseDate);
+
+  switch (recurring.frequency) {
+    case "daily":
+      next.setDate(next.getDate() + 1);
+      break;
+    case "weekly": {
+      // Advance by 7 days by default; if daysOfWeek specified, find the next matching day
+      if (recurring.daysOfWeek && recurring.daysOfWeek.length > 0) {
+        const currentDay = next.getDay();
+        const sorted = [...recurring.daysOfWeek].sort();
+        const nextDay = sorted.find((d) => d > currentDay);
+        if (nextDay !== undefined) {
+          next.setDate(next.getDate() + (nextDay - currentDay));
+        } else {
+          // Wrap to next week
+          next.setDate(next.getDate() + (7 - currentDay + sorted[0]!));
+        }
+      } else {
+        next.setDate(next.getDate() + 7);
+      }
+      break;
+    }
+    case "biweekly":
+      next.setDate(next.getDate() + 14);
+      break;
+    case "monthly":
+      next.setMonth(next.getMonth() + 1);
+      break;
+    case "custom":
+      next.setDate(next.getDate() + (recurring.interval ?? 1));
+      break;
+    default:
+      next.setDate(next.getDate() + 1);
+  }
+
+  return next;
 }

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/db";
-import { tasks } from "@/db/schema";
+import { notifications } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
@@ -14,9 +14,10 @@ export async function GET() {
 
   const result = await db
     .select()
-    .from(tasks)
-    .where(eq(tasks.userId, session.user.id))
-    .orderBy(desc(tasks.createdAt));
+    .from(notifications)
+    .where(eq(notifications.userId, session.user.id))
+    .orderBy(desc(notifications.createdAt))
+    .limit(50);
 
   return NextResponse.json(result);
 }
@@ -30,29 +31,22 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const [task] = await db
-      .insert(tasks)
+    const [notification] = await db
+      .insert(notifications)
       .values({
-        userId: session.user.id,
+        userId: body.userId ?? session.user.id,
+        type: body.type,
         title: body.title,
-        category: body.category,
-        subcategory: body.subcategory,
-        priority: body.priority ?? "medium",
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-        subtasks: body.subtasks ?? [],
-        tags: body.tags ?? [],
-        assignee: body.assignee,
-        notes: body.notes,
-        links: body.links ?? [],
-        recurring: body.recurring ?? null,
+        message: body.message,
+        taskId: body.taskId ?? null,
       })
       .returning();
 
-    return NextResponse.json(task, { status: 201 });
+    return NextResponse.json(notification, { status: 201 });
   } catch (error) {
-    console.error("Failed to create task:", error);
+    console.error("Failed to create notification:", error);
     return NextResponse.json(
-      { error: "Failed to create task" },
+      { error: "Failed to create notification" },
       { status: 500 },
     );
   }

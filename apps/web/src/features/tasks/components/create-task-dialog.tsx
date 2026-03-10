@@ -22,9 +22,11 @@ import {
   DialogDescription,
 } from "@repo/ui/dialog";
 import { DEFAULT_CATEGORIES } from "@/types/category";
-import type { CreateTaskInput } from "@/types/task";
+import type { CreateTaskInput, RecurringPattern } from "@/types/task";
 import { useCreateTask } from "../api/create-task";
 import { TagPicker } from "./tag-picker";
+import { RecurringPicker } from "./recurring-picker";
+import { AssigneePicker } from "@/features/household/components/assignee-picker";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -37,14 +39,27 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type CreateTaskDialogPrefill = {
+  title?: string;
+  category?: string;
+  subcategory?: string;
+  priority?: "high" | "medium" | "low";
+  dueDate?: string;
+  tags?: string[];
+  notes?: string;
+};
+
 type CreateTaskDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  prefill?: CreateTaskDialogPrefill;
 };
 
-export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ open, onOpenChange, prefill }: CreateTaskDialogProps) {
   const createTask = useCreateTask();
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(prefill?.tags ?? []);
+  const [recurring, setRecurring] = useState<RecurringPattern | undefined>();
+  const [assignee, setAssignee] = useState<string | undefined>();
 
   const {
     register,
@@ -56,8 +71,12 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      priority: "medium",
-      category: DEFAULT_CATEGORIES[0]?.id ?? "",
+      title: prefill?.title ?? "",
+      priority: prefill?.priority ?? "medium",
+      category: prefill?.category ?? DEFAULT_CATEGORIES[0]?.id ?? "",
+      subcategory: prefill?.subcategory,
+      dueDate: prefill?.dueDate,
+      notes: prefill?.notes,
     },
   });
 
@@ -72,11 +91,15 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
       subtasks: [],
       tags,
       links: [],
+      recurring,
+      assignee,
     };
     createTask.mutate(input, {
       onSuccess: () => {
         reset();
         setTags([]);
+        setRecurring(undefined);
+        setAssignee(undefined);
         onOpenChange(false);
       },
     });
@@ -183,6 +206,8 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
             />
           </div>
 
+          <AssigneePicker value={assignee} onChange={setAssignee} />
+
           <Textarea
             id="notes"
             label="Notes"
@@ -191,6 +216,8 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
           />
 
           <TagPicker value={tags} onChange={setTags} />
+
+          <RecurringPicker value={recurring} onChange={setRecurring} />
 
           {createTask.error && (
             <p className="body text-destructive">

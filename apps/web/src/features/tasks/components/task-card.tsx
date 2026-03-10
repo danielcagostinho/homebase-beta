@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { Repeat, Star } from "lucide-react";
 import { Checkbox } from "@repo/ui/checkbox";
 import { Badge } from "@repo/ui/badge";
 import { cn } from "@/utils/cn";
 import type { Task } from "@/types/task";
 import { DEFAULT_CATEGORIES } from "@/types/category";
+import { useHouseholdMembers } from "@/features/household/api/get-members";
+import { MemberAvatar } from "@/features/household/components/member-avatar";
 
 type TaskCardProps = {
   task: Task;
@@ -32,6 +34,11 @@ function isOverdue(dueDate: string | undefined): boolean {
 }
 
 export function TaskCard({ task, onToggleComplete, onToggleStar }: TaskCardProps) {
+  const { data: members } = useHouseholdMembers();
+  const assignedMember = task.assignee
+    ? members?.find((m) => m.id === task.assignee)
+    : undefined;
+
   const categoryName =
     DEFAULT_CATEGORIES.find((c) => c.id === task.category)?.name ??
     task.category;
@@ -88,12 +95,26 @@ export function TaskCard({ task, onToggleComplete, onToggleStar }: TaskCardProps
           {task.dueDate && (
             <span
               className={cn(
-                "caption",
+                "caption flex items-center gap-1",
                 overdue ? "text-destructive" : "text-muted-foreground",
               )}
             >
               {overdue && "Overdue: "}
               {new Date(task.dueDate).toLocaleDateString()}
+              {task.recurring && (
+                <span title={`Repeats ${(task.recurring as { frequency: string }).frequency}`}>
+                  <Repeat className="h-3 w-3" />
+                </span>
+              )}
+            </span>
+          )}
+          {!task.dueDate && task.recurring && (
+            <span
+              className="caption flex items-center gap-1 text-muted-foreground"
+              title={`Repeats ${(task.recurring as { frequency: string }).frequency}`}
+            >
+              <Repeat className="h-3 w-3" />
+              {(task.recurring as { frequency: string }).frequency}
             </span>
           )}
           {task.tags.length > 0 &&
@@ -120,6 +141,18 @@ export function TaskCard({ task, onToggleComplete, onToggleStar }: TaskCardProps
               </div>
             );
           })()}
+          {assignedMember && (
+            <div className="flex items-center gap-1.5">
+              <MemberAvatar
+                name={assignedMember.name}
+                image={assignedMember.image}
+                size="sm"
+              />
+              <span className="caption text-muted-foreground">
+                {assignedMember.name ?? assignedMember.email}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

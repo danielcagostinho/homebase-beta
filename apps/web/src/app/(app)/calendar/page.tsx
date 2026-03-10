@@ -1,3 +1,7 @@
+"use client";
+
+import { CalendarView } from "@/features/calendar/components/calendar-view";
+
 export default function CalendarPage() {
   return (
     <div className="flex flex-col gap-8">
@@ -8,9 +12,7 @@ export default function CalendarPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/50 p-12 text-center body text-muted-foreground">
-        Calendar views will be implemented in Phase 3
-      </div>
+      <CalendarView />
     </div>
   );
 }

@@ -26,11 +26,13 @@ import {
   DialogDescription,
 } from "@repo/ui/dialog";
 import { DEFAULT_CATEGORIES } from "@/types/category";
-import type { Subtask } from "@/types/task";
+import type { RecurringPattern, Subtask } from "@/types/task";
 import { useTask } from "../api/get-task";
 import { useUpdateTask } from "../api/update-task";
 import { useDeleteTask } from "../api/delete-task";
 import { TagPicker } from "./tag-picker";
+import { RecurringPicker } from "./recurring-picker";
+import { AssigneePicker } from "@/features/household/components/assignee-picker";
 import { useState } from "react";
 
 const editFormSchema = z.object({
@@ -56,6 +58,12 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [tags, setTags] = useState<string[]>(task?.tags ?? []);
+  const [recurring, setRecurring] = useState<RecurringPattern | undefined>(
+    task?.recurring as RecurringPattern | undefined,
+  );
+  const [assignee, setAssignee] = useState<string | undefined>(
+    task?.assignee ?? undefined,
+  );
 
   const {
     register,
@@ -105,7 +113,7 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
 
   function onSubmit(data: EditFormValues) {
     updateTask.mutate(
-      { id: taskId, ...data, tags },
+      { id: taskId, ...data, tags, recurring, assignee },
       { onSuccess: () => router.push("/tasks") },
     );
   }
@@ -265,9 +273,13 @@ export function TaskDetail({ taskId }: TaskDetailProps) {
           />
         </div>
 
+        <AssigneePicker value={assignee} onChange={setAssignee} />
+
         <Textarea id="notes" label="Notes" {...register("notes")} />
 
         <TagPicker value={tags} onChange={setTags} />
+
+        <RecurringPicker value={recurring} onChange={setRecurring} />
 
         {/* Subtasks */}
         <div className="flex flex-col gap-3">
