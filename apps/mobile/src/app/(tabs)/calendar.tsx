@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { useTasks, useUpdateTask } from "../../hooks/use-tasks";
 import type { Task } from "@repo/shared/types/task";
 
@@ -104,6 +106,7 @@ function TaskItem({ task }: { task: Task }) {
   const updateTask = useUpdateTask();
 
   const handleToggleComplete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isCompleted = task.status === "completed";
     updateTask.mutate({
       id: task.id,
@@ -161,7 +164,7 @@ export default function CalendarScreen() {
     () => new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const { data: tasks } = useTasks();
+  const { data: tasks, isLoading } = useTasks();
 
   const allTasks = tasks ?? [];
 
@@ -223,7 +226,12 @@ export default function CalendarScreen() {
         <TouchableOpacity onPress={goToPrevMonth} style={styles.navButton}>
           <Ionicons name="chevron-back" size={22} color="#4a3f3a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{formatMonthYear(currentMonth)}</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>{formatMonthYear(currentMonth)}</Text>
+          {isLoading && (
+            <ActivityIndicator size="small" color="#b08068" style={styles.headerSpinner} />
+          )}
+        </View>
         <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
           <Ionicons name="chevron-forward" size={22} color="#4a3f3a" />
         </TouchableOpacity>
@@ -346,13 +354,21 @@ const styles = StyleSheet.create({
   navButton: {
     padding: 6,
   },
-  headerTitle: {
+  headerTitleRow: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
     fontFamily: serifFont,
     color: "#4a3f3a",
     textAlign: "center",
+  },
+  headerSpinner: {
+    marginLeft: 8,
   },
   todayButton: {
     backgroundColor: "#f0e6de",

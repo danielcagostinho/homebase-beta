@@ -24,7 +24,7 @@ const serifFont = Platform.select({
 });
 
 export default function ProfileScreen() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const router = useRouter();
   const { data: tasks } = useTasks();
   const { data: unlockedAchievements } = useAchievements();
@@ -91,10 +91,12 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>U</Text>
+            <Text style={styles.avatarText}>
+              {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+            </Text>
           </View>
-          <Text style={styles.userName}>User</Text>
-          <Text style={styles.userEmail}>Signed in</Text>
+          <Text style={styles.userName}>{user?.name ?? "User"}</Text>
+          <Text style={styles.userEmail}>{user?.email ?? "Signed in"}</Text>
         </View>
 
         {/* Stats Row */}

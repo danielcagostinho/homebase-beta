@@ -7,11 +7,15 @@ import {
   StyleSheet,
   Platform,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useTasks, useUpdateTask } from "../../hooks/use-tasks";
+import * as Haptics from "expo-haptics";
+import { useTasks, useUpdateTask, useDeleteTask } from "../../hooks/use-tasks";
+import { useNotifications } from "../../hooks/use-notifications";
+import { TaskSkeleton } from "../../components/task-skeleton";
 import type { Task } from "@repo/shared/types/task";
 
 const serifFont = Platform.select({
@@ -46,8 +50,10 @@ function TaskItem({ task }: { task: Task }) {
   const category =
     task.category ? categoryStyles[task.category.toLowerCase()] : null;
   const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
 
   const handleToggleComplete = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const isCompleted = task.status === "completed";
     updateTask.mutate({
       id: task.id,
@@ -56,10 +62,37 @@ function TaskItem({ task }: { task: Task }) {
     });
   }, [task.id, task.status, updateTask]);
 
+  const handleLongPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isCompleted = task.status === "completed";
+    Alert.alert("Task Actions", task.title, [
+      {
+        text: isCompleted ? "Mark Active" : "Mark Complete",
+        onPress: handleToggleComplete,
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: () => deleteTask.mutate(task.id),
+            },
+          ]);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }, [task.id, task.title, task.status, handleToggleComplete, deleteTask]);
+
   return (
     <TouchableOpacity
       style={styles.taskItem}
       onPress={() => router.push(`/task/${task.id}`)}
+      onLongPress={handleLongPress}
     >
       <TouchableOpacity onPress={handleToggleComplete}>
         <View
@@ -141,6 +174,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 
 export default function TasksScreen() {
   const { data: tasks, isLoading, refetch } = useTasks();
+  const { data: notifications } = useNotifications();
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
 
@@ -162,12 +196,24 @@ export default function TasksScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>HomeBase</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push("/create-task")}
-        >
-          <Ionicons name="add" size={24} color="#ffffff" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => router.push("/notifications")}
+            hitSlop={8}
+          >
+            <Ionicons name="notifications-outline" size={22} color="#8a7f78" />
+            {(notifications ?? []).filter((n) => !n.read).length > 0 && (
+              <View style={styles.bellBadge} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push("/create-task")}
+          >
+            <Ionicons name="add" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.filterRow}>
@@ -197,8 +243,10 @@ export default function TasksScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.centered}>
-          <Text style={styles.loadingText}>Loading tasks...</Text>
+        <View style={styles.skeletonContainer}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <TaskSkeleton key={i} />
+          ))}
         </View>
       ) : (
         <FlatList
@@ -243,6 +291,24 @@ const styles = StyleSheet.create({
     fontFamily: serifFont,
     color: "#4a3f3a",
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  bellButton: {
+    position: "relative",
+    padding: 4,
+  },
+  bellBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#dc3545",
+  },
   addButton: {
     backgroundColor: "#b08068",
     width: 40,
@@ -277,6 +343,10 @@ const styles = StyleSheet.create({
   },
   filterTabTextInactive: {
     color: "#4a3f3a",
+  },
+  skeletonContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   centered: {
     flex: 1,

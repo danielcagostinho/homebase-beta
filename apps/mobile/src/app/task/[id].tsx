@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -38,6 +38,7 @@ export default function TaskDetailScreen() {
 
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   useEffect(() => {
     if (task) {
@@ -65,6 +66,34 @@ export default function TaskDetailScreen() {
     if (!task || notes === (task.notes ?? "")) return;
     updateTask.mutate({ id: task.id, notes });
   };
+
+  const handleToggleStarred = useCallback(() => {
+    if (!task) return;
+    updateTask.mutate({ id: task.id, starred: !task.starred });
+  }, [task, updateTask]);
+
+  const handleToggleSubtask = useCallback(
+    (subtaskId: string) => {
+      if (!task || !task.subtasks) return;
+      const updatedSubtasks = task.subtasks.map((s) =>
+        s.id === subtaskId ? { ...s, completed: !s.completed } : s
+      );
+      updateTask.mutate({ id: task.id, subtasks: updatedSubtasks });
+    },
+    [task, updateTask]
+  );
+
+  const handleAddSubtask = useCallback(() => {
+    if (!task || newSubtaskTitle.trim() === "") return;
+    const newSubtask = {
+      id: Date.now().toString(),
+      title: newSubtaskTitle.trim(),
+      completed: false,
+    };
+    const updatedSubtasks = [...(task.subtasks ?? []), newSubtask];
+    updateTask.mutate({ id: task.id, subtasks: updatedSubtasks });
+    setNewSubtaskTitle("");
+  }, [task, newSubtaskTitle, updateTask]);
 
   const handleDelete = () => {
     if (!task) return;
@@ -124,6 +153,17 @@ export default function TaskDetailScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {task.title}
         </Text>
+        <TouchableOpacity
+          onPress={handleToggleStarred}
+          style={styles.headerButton}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={task.starred ? "star" : "star-outline"}
+            size={22}
+            color={task.starred ? "#e8a838" : "#8a7f78"}
+          />
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={handleDelete}
           style={styles.headerButton}
@@ -222,29 +262,44 @@ export default function TaskDetailScreen() {
 
         {/* Subtasks Section */}
         <Text style={styles.sectionTitle}>Subtasks</Text>
-        {task.subtasks && task.subtasks.length > 0 ? (
-          <View style={styles.subtasksList}>
-            {task.subtasks.map((subtask) => (
-              <View key={subtask.id} style={styles.subtaskRow}>
-                <Ionicons
-                  name={subtask.completed ? "checkbox" : "square-outline"}
-                  size={20}
-                  color={subtask.completed ? "#b08068" : "#8a7f78"}
-                />
-                <Text
-                  style={[
-                    styles.subtaskTitle,
-                    subtask.completed && styles.subtaskTitleCompleted,
-                  ]}
-                >
-                  {subtask.title}
-                </Text>
-              </View>
-            ))}
+        <View style={styles.subtasksList}>
+          {(task.subtasks ?? []).map((subtask) => (
+            <TouchableOpacity
+              key={subtask.id}
+              style={styles.subtaskRow}
+              onPress={() => handleToggleSubtask(subtask.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={subtask.completed ? "checkbox" : "square-outline"}
+                size={20}
+                color={subtask.completed ? "#b08068" : "#8a7f78"}
+              />
+              <Text
+                style={[
+                  styles.subtaskTitle,
+                  subtask.completed && styles.subtaskTitleCompleted,
+                ]}
+              >
+                {subtask.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          <View style={styles.addSubtaskRow}>
+            <TextInput
+              style={styles.addSubtaskInput}
+              value={newSubtaskTitle}
+              onChangeText={setNewSubtaskTitle}
+              placeholder="Add subtask..."
+              placeholderTextColor="#8a7f78"
+              onSubmitEditing={handleAddSubtask}
+              returnKeyType="done"
+            />
+            <TouchableOpacity onPress={handleAddSubtask} hitSlop={8}>
+              <Ionicons name="add-circle-outline" size={24} color="#b08068" />
+            </TouchableOpacity>
           </View>
-        ) : (
-          <Text style={styles.emptyText}>No subtasks</Text>
-        )}
+        </View>
 
         {/* Tags Section */}
         <Text style={styles.sectionTitle}>Tags</Text>
@@ -436,6 +491,22 @@ const styles = StyleSheet.create({
   subtaskTitleCompleted: {
     textDecorationLine: "line-through",
     color: "#8a7f78",
+  },
+  addSubtaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#e2d9d0",
+  },
+  addSubtaskInput: {
+    flex: 1,
+    fontFamily: serifFont,
+    fontSize: 14,
+    color: "#4a3f3a",
+    padding: 0,
   },
   tagsRow: {
     flexDirection: "row",

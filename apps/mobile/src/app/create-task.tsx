@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useCreateTask } from "../../hooks/use-tasks";
 import type { TaskPriority } from "@repo/shared/types/task";
 
@@ -33,8 +34,8 @@ export default function CreateTaskScreen() {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [dueDate, setDueDate] = useState("");
-  const [showDateInput, setShowDateInput] = useState(false);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
@@ -57,7 +58,7 @@ export default function CreateTaskScreen() {
       category: category.toLowerCase(),
       priority,
       notes: notes.trim() || undefined,
-      dueDate: dueDate.trim() ? new Date(dueDate.trim()).toISOString() : undefined,
+      dueDate: dueDate ? dueDate.toISOString() : undefined,
     };
 
     createTask.mutate(input, {
@@ -166,25 +167,54 @@ export default function CreateTaskScreen() {
         {/* Due Date */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Due Date</Text>
-          {showDateInput ? (
-            <TextInput
-              style={styles.textInput}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#8a7f78"
-              value={dueDate}
-              onChangeText={setDueDate}
-              keyboardType="numbers-and-punctuation"
-              autoFocus
-            />
-          ) : (
+          <View style={styles.dateRow}>
             <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDateInput(true)}
+              style={[styles.dateButton, { flex: 1 }]}
+              onPress={() => {
+                if (Platform.OS === "android" && !showDatePicker) {
+                  setShowDatePicker(true);
+                } else {
+                  setShowDatePicker(!showDatePicker);
+                }
+              }}
             >
               <Text style={dueDate ? styles.dateText : styles.datePlaceholder}>
-                {dueDate || "No due date"}
+                {dueDate
+                  ? dueDate.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "No due date"}
               </Text>
             </TouchableOpacity>
+            {dueDate && (
+              <TouchableOpacity
+                style={styles.dateClearButton}
+                onPress={() => {
+                  setDueDate(null);
+                  setShowDatePicker(false);
+                }}
+              >
+                <Text style={styles.dateClearText}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {showDatePicker && (
+            <DateTimePicker
+              value={dueDate ?? new Date()}
+              mode="date"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(_event, selectedDate) => {
+                if (Platform.OS === "android") {
+                  setShowDatePicker(false);
+                }
+                if (selectedDate) {
+                  setDueDate(selectedDate);
+                }
+              }}
+              style={Platform.OS === "ios" ? { marginTop: 8 } : undefined}
+            />
           )}
         </View>
 
@@ -318,6 +348,11 @@ const styles = StyleSheet.create({
   chipTextUnselected: {
     color: "#4a3f3a",
   },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   dateButton: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
@@ -333,6 +368,17 @@ const styles = StyleSheet.create({
   datePlaceholder: {
     fontSize: 16,
     color: "#8a7f78",
+  },
+  dateClearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#f0e6de",
+  },
+  dateClearText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#b08068",
   },
   footer: {
     padding: 16,
