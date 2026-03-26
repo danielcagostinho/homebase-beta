@@ -3,6 +3,7 @@
 A household task management app with shared task lists, calendar views, AI-powered task input, and gamification. Built as a modern web + mobile app.
 
 **Live site:** https://homebase-beta-vert.vercel.app
+**Security audit:** [docs/AUDIT_FINDINGS.md](docs/AUDIT_FINDINGS.md) — Review of legacy app vulnerabilities and how this rebuild addresses them
 
 ---
 

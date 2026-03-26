@@ -13,7 +13,7 @@ import {
 import { router } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
-import { useCreateTask } from "../../hooks/use-tasks";
+import { useCreateTask } from "../hooks/use-tasks";
 import type { TaskPriority } from "@repo/shared/types/task";
 
 const CATEGORIES = ["Home", "Personal", "Work"];
